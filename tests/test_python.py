@@ -129,3 +129,35 @@ def pick(x):
         ("pkg.tag.Tag", "__call__", 10),
         ("pkg.tag", "pick", 16),
     ]
+
+
+def test_protocol_stub_members_are_not_functions():
+    source = '''
+import typing
+from typing import Protocol
+
+class Clock(Protocol):
+    def now(self) -> int: ...
+    def sleep(self, seconds: float) -> None:
+        """Wait."""
+        ...
+    def doc_only(self) -> None:
+        """Only a docstring."""
+    def real(self) -> int:
+        return 1
+
+class Unit(typing.Protocol[T]):
+    @property
+    def name(self) -> str: ...
+
+class Plain:
+    def todo(self) -> None: ...
+
+def stub() -> None: ...
+'''
+    found = functions_in_source(source, "src/pkg/clock.py")
+    assert [(f.namespace, f.name) for f in found] == [
+        ("pkg.clock.Clock", "real"),
+        ("pkg.clock.Plain", "todo"),
+        ("pkg.clock", "stub"),
+    ]

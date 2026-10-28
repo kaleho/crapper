@@ -102,6 +102,26 @@ def _is_overload(data: bytes, node) -> bool:
     )
 
 
+_PROTOCOLS = {"Protocol", "typing.Protocol"}
+_STUB_PARTS = {"string", "ellipsis", "comment"}
+
+
+def _is_protocol_stub(data: bytes, node) -> bool:
+    """A Protocol member whose body is only a docstring and/or `...` never runs."""
+
+    owner = node.parent.parent if node.parent.type == "decorated_definition" else node.parent
+    cls = owner.parent if owner is not None and owner.type == "block" else None
+    if cls is None or cls.type != "class_definition":
+        return False
+    bases = cls.child_by_field_name("superclasses")
+    if bases is None or not any(
+        node_text(data, base).split("[")[0] in _PROTOCOLS for base in bases.named_children
+    ):
+        return False
+    body = node.child_by_field_name("body")
+    return all(statement.type in _STUB_PARTS for statement in body.named_children)
+
+
 def _class_names(data: bytes, node) -> list[str]:
     names: list[str] = []
     current = node.parent
@@ -122,7 +142,7 @@ def functions_in_source(
     module = _module_namespace(path, source_root)
     found: list[Function] = []
     for node in descendants(tree.root_node):
-        if node.type != "function_definition" or _is_nested_function(node) or _is_overload(data, node):
+        if node.type != "function_definition" or _is_nested_function(node) or _is_overload(data, node) or _is_protocol_stub(data, node):
             continue
         ident = child_of_type(node, "identifier")
         if ident is None:
