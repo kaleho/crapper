@@ -103,3 +103,29 @@ def literal():
     assert [(fn.namespace, fn.name, fn.complexity) for fn in functions] == [
         ("demo", "literal", 1)
     ]
+
+
+def test_overload_stubs_are_not_functions():
+    source = """
+import typing
+from typing import overload
+
+class Tag:
+    @overload
+    def __call__(self, fn: int) -> int: ...
+    @typing.overload
+    def __call__(self, fn: str) -> str: ...
+    def __call__(self, fn):
+        return fn
+
+@overload
+def pick(x: int) -> int: ...
+@staticmethod
+def pick(x):
+    return x
+"""
+    found = functions_in_source(source, "src/pkg/tag.py")
+    assert [(f.namespace, f.name, f.start_line) for f in found] == [
+        ("pkg.tag.Tag", "__call__", 10),
+        ("pkg.tag", "pick", 16),
+    ]

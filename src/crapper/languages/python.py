@@ -89,6 +89,19 @@ def _is_nested_function(node) -> bool:
     return False
 
 
+def _is_overload(data: bytes, node) -> bool:
+    """A typing.overload stub never runs, so it has no coverage to score."""
+
+    parent = node.parent
+    if parent is None or parent.type != "decorated_definition":
+        return False
+    return any(
+        node_text(data, child).lstrip("@").strip() in {"overload", "typing.overload"}
+        for child in parent.children
+        if child.type == "decorator"
+    )
+
+
 def _class_names(data: bytes, node) -> list[str]:
     names: list[str] = []
     current = node.parent
@@ -109,7 +122,7 @@ def functions_in_source(
     module = _module_namespace(path, source_root)
     found: list[Function] = []
     for node in descendants(tree.root_node):
-        if node.type != "function_definition" or _is_nested_function(node):
+        if node.type != "function_definition" or _is_nested_function(node) or _is_overload(data, node):
             continue
         ident = child_of_type(node, "identifier")
         if ident is None:
